@@ -1,0 +1,82 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:aiphoto}
+    username: ${POSTGRES_USER:aiphoto}
+    password: ${POSTGRES_PASSWORD:aiphoto}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+      hibernate.types.contributor.disable: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minio
+    secret-key: minio123
+    bucket: ai-photo-bot
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+  config: classpath:logback-spring.xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+
+app:
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+
+telegram:
+  bot:
+    api-url: ${TELEGRAM_API_URL:https://api.telegram.org}
+    token: ${TELEGRAM_BOT_TOKEN:*****}   # либо подставь значение прямо здесь для локалки
+
+fireworks:
+  base-url: ${FIREWORKS_BASE_URL:http://localhost:8081}
+
+fal:
+  api-base: https://fal.run
+  api-key: ${FAL_KEY:}
+  timeout-sec: 120
+  training:
+    endpoint: fal-ai/flux-lora-portrait-trainer
+    steps: 1600
+  generation:
+    endpoint: fal-ai/flux/dev
+    width: 896
+    height: 1152
+    steps: 25
+    guidance: 3.5
+    lora-scale: 0.6
+    seed:
+  realism:
+    endpoint: fal-ai/flux-realism
+    steps: 12
+    strength: 0.65
+  business:
+    min-photos: 10
+    max-photos: 30
+    images-per-request: 3
+    training-eta-min: 5
