@@ -1,109 +1,97 @@
-# AI Photo Bot
+# AI Photo Studio — Telegram-бот для персональных AI-фотосессий
 
-Java 21 / Spring Boot 3.3 project that provides a clean, testable foundation for an AI powered photo generation bot. The codebase follows a hexagonal architecture with a clear separation between the domain (`core`), adapters and the Spring Boot application layer (`app`).
+Java, Core, Spring Boot, Spring Data JPA, PostgreSQL, Telegram Bot API, Docker, Maven, Reactor
 
-## Modules
+## О проекте
 
-- `core` – Domain model, ports and use-cases. No Spring dependencies.
-- `adapter-persistence` – PostgreSQL persistence layer using Spring Data JPA and Flyway.
-- `adapter-fireworks` – HTTP client for the external AI image generation API.
-- `adapter-telegram` – Telegram webhook adapter (stub implementation).
-- `adapter-web` – REST API adapters, springdoc OpenAPI configuration and Actuator endpoints.
-- `app` – Spring Boot application wiring adapters and exposing transactional facades. Includes Jib container build configuration.
+Коммерческий Telegram-бот для создания персональных AI-фотосессий.  
+Пользователь загружает свои фотографии, система обучает персональную модель и генерирует реалистичные изображения в различных стилях или по текстовому описанию.
 
-## Getting started
+Проект реализован как полноценный продукт: с платежами, лимитами генераций, воронкой продаж, отложенными предложениями и повторными покупками.
 
-### Prerequisites
+## Архитектура
 
+Проект построен по принципам **Clean Architecture** и **Hexagonal Architecture (Ports & Adapters)**  
+и разделён на независимые модули.
+
+## Core (бизнес-логика)
+
+Модуль **core** — сердце проекта.
+
+- Не зависит от Telegram, Spring и базы данных
+- Содержит всю бизнес-логику:
+  - заказы
+  - лимиты генераций
+  - правила покупок
+  - статусы обучения модели
+  - добивки и повторные покупки
+- Использует только Java и собственные интерфейсы (ports)
+
+Такой подход позволяет:
+- легко тестировать бизнес-логику
+- менять Telegram на другой канал (Web, Mobile)
+- менять БД без переписывания core-кода
+
+## Telegram Bot
+
+Модуль **adapter-telegram** реализует пользовательский интерфейс и сценарии:
+
+- Webhook-обработчик обновлений
+- Inline-кнопки и callback-логика
+- Telegram Payments:
+  - invoices
+  - pre_checkout
+  - successful_payment
+- Follow-up сценарии:
+  - через 30 минут после оффера
+  - через 24 часа с вопросом «что остановило»
+- Разные UX-ветки в зависимости от действий пользователя
+
+## Payments & Offers
+
+Реализована полноценная коммерческая логика:
+
+- Основная покупка:
+  - персональная модель
+  - 60 сгенерированных фото
+- Follow-up пакеты:
+  - через 30 минут — 1 модель + 18 фото
+  - через 24 часа — 1 модель + 18 фото
+- Дополнительные пакеты фотографий
+- Идемпотентная обработка платежей
+- Покупка открывает доступ к следующему этапу:
+  - загрузка фото
+  - обучение модели
+  - генерация изображений
+
+## Scheduler
+
+Отдельный scheduler-сервис:
+
+- проверяет заказы раз в минуту
+- отправляет follow-up предложения только если покупка не совершена
+- никогда не отправляет дубли
+- вся логика основана на timestamps в базе данных
+
+## Tech Stack
+
+### Backend
 - Java 21
-- Maven 3.9+
-- Docker (for Testcontainers and local Postgres/MinIO services)
+- Spring Boot
+- Spring Scheduling
+- Spring Data JPA
+- Hibernate
+- PostgreSQL
+- Reactor (асинхронная обработка)
 
-### Local services
+### Architecture
+- Clean Architecture
+- Hexagonal Architecture (Ports & Adapters)
+- Multi-module Maven project
+- Dependency Inversion Principle
 
-A minimal `docker compose` snippet to launch the required infrastructure:
-
-```yaml
-services:
-  postgres:
-    image: postgres:16.3-alpine
-    environment:
-      POSTGRES_DB: aiphoto
-      POSTGRES_USER: aiphoto
-      POSTGRES_PASSWORD: aiphoto
-    ports:
-      - "5432:5432"
-  minio:
-    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
-    command: server /data
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-```
-
-Start the services:
-
-```bash
-docker compose up -d postgres minio
-```
-
-### Build & test
-
-All integration tests run against PostgreSQL via Testcontainers, no H2 is used.
-
-```bash
-mvn clean verify
-```
-
-For CI parity (explicit profile, enables integration tests):
-
-```bash
-mvn -Pci -DskipITs=false clean verify
-```
-
-### Run the application
-
-Point the application to your Postgres instance (for example using the `local` profile):
-
-```bash
-SPRING_PROFILES_ACTIVE=local \
-POSTGRES_HOST=localhost \
-POSTGRES_PORT=5432 \
-POSTGRES_DB=aiphoto \
-POSTGRES_USER=aiphoto \
-POSTGRES_PASSWORD=aiphoto \
-mvn -pl app spring-boot:run
-```
-
-Once started:
-
-- Actuator health: `http://localhost:8080/actuator/health`
-- OpenAPI document: `http://localhost:8080/v3/api-docs`
-
-### Container image
-
-The app module is configured with the Jib Maven plugin. To build a local image tarball:
-
-```bash
-mvn -pl app jib:buildTar
-```
-
-The resulting `app/target/jib-image.tar` can be loaded with `docker load`.
-
-## Testing strategy
-
-- **Unit tests (core)** validate use-case logic using in-memory fakes.
-- **Integration tests (adapter-persistence)** run against PostgreSQL via Testcontainers, executing Flyway migrations.
-- **Contract tests (adapter-fireworks)** verify the external API client using WireMock.
-- **Web tests (adapter-web, adapter-telegram, app)** ensure controllers and Actuator endpoints respond correctly.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidance on project standards and workflow.
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+### Telegram
+- Telegram Bot API
+- Webhooks
+- Inline keyboards
+- Payments
